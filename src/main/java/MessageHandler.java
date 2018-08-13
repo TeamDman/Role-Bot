@@ -207,12 +207,15 @@ public class MessageHandler {
 			}
 		}),
 		LISTCLAIMS(USER, "", (event, args) -> {
-			new PaginatorListener(event.getChannel(), event.getAuthor(), Lists.partition(claims, 10).stream()
-					.map(list -> new EmbedBuilder()
-							.withTitle("Claims Information")
-							.withColor(Color.CYAN)
-							.appendDesc(list.stream().map(c -> "<@" + c.user + ">\t<@&" + c.role + ">\t" + new Date(c.time).toString()).collect(Collectors.joining("\n")))
-					).collect(Collectors.toList()));
+			if (claims.size() == 0)
+				RequestBuffer.request(() -> event.getChannel().sendMessage("There are no claims currently."));
+			else
+				new PaginatorListener(event.getChannel(), event.getAuthor(), Lists.partition(claims, 10).stream()
+						.map(list -> new EmbedBuilder()
+								.withTitle("Claims Information")
+								.withColor(Color.CYAN)
+								.appendDesc(list.stream().map(c -> "<@" + c.user + ">\t<@&" + c.role + ">\t" + new Date(c.time).toString()).collect(Collectors.joining("\n")))
+						).collect(Collectors.toList()));
 		}),
 		FORCECLAIM(ADMIN, "userid roleid", (event, args) -> {
 			String[] a    = args.split("\\s+");
@@ -272,7 +275,7 @@ public class MessageHandler {
 			RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 					.withTitle("Claims Update")
 					.withColor(Color.ORANGE)
-					.appendDesc("The cooldown is now " + Long.valueOf(main.config.get(Config.Property.COOLDOWN))/1000 + " seconds.").build()));
+					.appendDesc("The cooldown is now " + Long.valueOf(main.config.get(Config.Property.COOLDOWN)) / 1000 + " seconds.").build()));
 		});
 
 		public final BiConsumer<MessageReceivedEvent, String> action;
