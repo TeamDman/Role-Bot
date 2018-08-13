@@ -22,7 +22,7 @@ public class MessageHandler {
 	private static final EnumSet<Permissions> USER            = EnumSet.noneOf(Permissions.class);
 	private static final Set<Long>            blacklist       = Sets.newHashSet();
 	private static final List<Claim>          claims          = Lists.newArrayList();
-	private static final Pattern              cmdPattern      = Pattern.compile("^/claimz (\\w+)\\s?(.*)");
+	private static final Pattern              cmdPattern      = Pattern.compile("^/claims (\\w+)\\s?(.*)");
 	private static final List<Color>          colourBlacklist = Lists.newArrayList(new Color(51, 152, 219), new Color(255, 0, 0));
 	private static final int                  colourCutoff    = 200;
 
