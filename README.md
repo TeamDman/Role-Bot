@@ -1,6 +1,10 @@
 # Role-Bot
 A java based discord bot to manage custom user roles.
 
+Users may claim roles with the `/claims claim <id>` command.
+From there, they can use either `/claims renameclaim <id> <name>` or `/claims recolourclaim <id> <r> <g> <b>`
+
+
 # Setup
 Running `java -jar role-bot-version-all.jar` will load the bot.
 It will generate a `bot.properties` file, where you can configure some aspects of the bot.
