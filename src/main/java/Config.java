@@ -30,7 +30,7 @@ public class Config {
 
 	private void save() {
 		try (FileOutputStream out = new FileOutputStream(name + ".properties")) {
-			props.store(out, "MUTETYPE can be either 'role' or 'perms'");
+			props.store(out, "");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -54,6 +54,7 @@ public class Config {
 
 	public enum Property {
 		DISCORD_TOKEN("undefined"),
+		COOLDOWN("10000");
 		final Object fallback;
 
 		Property(Object fallback) {
