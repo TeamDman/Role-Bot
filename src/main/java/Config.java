@@ -54,7 +54,8 @@ public class Config {
 
 	public enum Property {
 		DISCORD_TOKEN("undefined"),
-		COOLDOWN("60000");
+		COOLDOWN("60000"),
+		MAXCHANGES("5");
 		final Object fallback;
 
 		Property(Object fallback) {

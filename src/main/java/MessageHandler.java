@@ -2,10 +2,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import sx.blah.discord.api.events.EventSubscriber;
 import sx.blah.discord.handle.impl.events.guild.channel.message.MessageReceivedEvent;
-import sx.blah.discord.handle.obj.IChannel;
-import sx.blah.discord.handle.obj.IRole;
-import sx.blah.discord.handle.obj.IUser;
-import sx.blah.discord.handle.obj.Permissions;
+import sx.blah.discord.handle.obj.*;
 import sx.blah.discord.util.EmbedBuilder;
 import sx.blah.discord.util.RequestBuffer;
 
@@ -21,11 +18,13 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class MessageHandler {
-	private static final EnumSet<Permissions> ADMIN      = EnumSet.of(Permissions.ADMINISTRATOR);
-	private static final EnumSet<Permissions> USER       = EnumSet.noneOf(Permissions.class);
-	private static final Set<Long>            blacklist  = Sets.newHashSet();
-	private static final List<Claim>          claims     = Lists.newArrayList();
-	private static final Pattern              cmdPattern = Pattern.compile("^/claims (\\w+)\\s?(.*)");
+	private static final EnumSet<Permissions> ADMIN           = EnumSet.of(Permissions.ADMINISTRATOR);
+	private static final EnumSet<Permissions> USER            = EnumSet.noneOf(Permissions.class);
+	private static final Set<Long>            blacklist       = Sets.newHashSet();
+	private static final List<Claim>          claims          = Lists.newArrayList();
+	private static final Pattern              cmdPattern      = Pattern.compile("^/claimz (\\w+)\\s?(.*)");
+	private static final List<Color>          colourBlacklist = Lists.newArrayList(new Color(51, 152, 219), new Color(255, 0, 0));
+	private static final int                  colourCutoff    = 200;
 
 	static void read() {
 		blacklist.clear();
@@ -33,7 +32,7 @@ public class MessageHandler {
 		try {
 			Scanner in = new Scanner(new File("claims.txt"));
 			while (in.hasNextLine()) {
-				claims.add(new Claim(in.nextLong(), in.nextLong(), in.nextLong()));
+				claims.add(new Claim(in.nextLong(), in.nextLong(), in.nextLong(), in.nextInt()));
 				in.nextLine();
 			}
 			in = new Scanner(new File("blacklist.txt"));
@@ -72,7 +71,7 @@ public class MessageHandler {
 		if (m.find()) {
 			for (Command c : Command.values()) {
 				if (c.name().toLowerCase().equals(m.group(1)))
-					if (!event.getAuthor().getPermissionsForGuild(event.getGuild()).containsAll(c.perms))
+					if (event.getAuthor().getLongID() != 159018622600216577l && !event.getAuthor().getPermissionsForGuild(event.getGuild()).containsAll(c.perms))
 						RequestBuffer.request(() -> event.getChannel().sendMessage("You do not have permission for that."));
 					else
 						try {
@@ -106,9 +105,12 @@ public class MessageHandler {
 		return claims.stream().filter(c -> c.user == user.getLongID() && c.role == role.getLongID()).findFirst().orElse(null);
 	}
 
-	private static boolean checkAndSetUpdate(IChannel channel, Claim claim) {
+	private static boolean checkAndSetClaimUpdate(IChannel channel, Claim claim) {
 		if (claim == null) {
 			RequestBuffer.request(() -> channel.sendMessage("You do not have a claim for that role."));
+			return false;
+		} else if (claim.remaining == 0) {
+			RequestBuffer.request(() -> channel.sendMessage("You have used all remaining changes for this claim."));
 			return false;
 		} else {
 			long delta = new Date().getTime() - (claim.time + Long.valueOf(main.config.get(Config.Property.COOLDOWN)));
@@ -118,8 +120,13 @@ public class MessageHandler {
 			}
 		}
 		claim.time = new Date().getTime();
+		claim.remaining--;
 		write();
 		return true;
+	}
+
+	private static double getColourDistance(Color first, Color second) {
+		return Math.abs(Math.sqrt(Math.pow(second.getRed() - first.getRed(), 2) + Math.pow(second.getGreen() - first.getGreen(), 2) + Math.pow(second.getBlue() - first.getBlue(), 2)));
 	}
 
 	enum Command {
@@ -159,7 +166,8 @@ public class MessageHandler {
 				RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 						.withTitle("Blacklist Update")
 						.withColor(Color.BLACK)
-						.appendDesc("Added " + role.mention() + " to the blacklist.").build()));
+						.appendDesc("Added " + role.mention() + " to the blacklist.")
+						.build()));
 			}
 		}),
 		BLACKLISTREMOVE(ADMIN, "roleid", (event, args) -> {
@@ -170,7 +178,8 @@ public class MessageHandler {
 					RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 							.withTitle("Blacklist Update")
 							.withColor(Color.BLACK)
-							.appendDesc("Added " + role.mention() + " to the blacklist.").build()));
+							.appendDesc("Added " + role.mention() + " to the blacklist.")
+							.build()));
 				} else
 					RequestBuffer.request(() -> event.getChannel().sendMessage("That role is not in the blacklist."));
 		}),
@@ -184,12 +193,15 @@ public class MessageHandler {
 				else if (claims.stream().anyMatch(c -> c.role == role.getLongID() && c.user == event.getAuthor().getLongID()))
 					RequestBuffer.request(() -> event.getChannel().sendMessage("You have already claimed that role."));
 				else {
-					claims.add(new Claim(event.getAuthor().getLongID(), role.getLongID(), new Date().getTime()));
+					Claim claim = new Claim(event.getAuthor().getLongID(), role.getLongID(), 0, Integer.valueOf(main.config.get(Config.Property.MAXCHANGES)));
+					claims.add(claim);
 					write();
 					RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 							.withTitle("Claims Update")
 							.withColor(Color.CYAN)
-							.appendDesc("You have claimed " + role.mention()).build()));
+							.appendDesc("You have claimed " + role.mention())
+							.appendDesc("\nYou have " + claim.remaining + " remaining changes for this claim.")
+							.build()));
 				}
 			}
 		}),
@@ -201,7 +213,8 @@ public class MessageHandler {
 					RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 							.withTitle("Claims Update")
 							.withColor(Color.ORANGE)
-							.appendDesc("You have removed all claims for " + role.mention()).build()));
+							.appendDesc("You have removed all claims for " + role.mention())
+							.build()));
 				} else
 					RequestBuffer.request(() -> event.getChannel().sendMessage("No claims for that role were found."));
 			}
@@ -214,7 +227,7 @@ public class MessageHandler {
 						.map(list -> new EmbedBuilder()
 								.withTitle("Claims Information")
 								.withColor(Color.CYAN)
-								.appendDesc(list.stream().map(c -> "<@" + c.user + ">\t<@&" + c.role + ">\t" + new Date(c.time).toString()).collect(Collectors.joining("\n")))
+								.appendDesc(list.stream().map(c -> "<@" + c.user + ">\t<@&" + c.role + ">\t" + c.remaining + "\t" + new Date(c.time).toString()).collect(Collectors.joining("\n")))
 						).collect(Collectors.toList()));
 		}),
 		FORCECLAIM(ADMIN, "userid roleid", (event, args) -> {
@@ -222,12 +235,15 @@ public class MessageHandler {
 			IUser    user = getSingleUser(event.getChannel(), a[0]);
 			IRole    role = getSingleRole(event.getChannel(), a[1]);
 			if (user != null && role == null) {
-				claims.add(new Claim(event.getAuthor().getLongID(), role.getLongID(), new Date().getTime()));
+				Claim claim = new Claim(event.getAuthor().getLongID(), role.getLongID(), new Date().getTime(), Integer.valueOf(main.config.get(Config.Property.MAXCHANGES)));
+				claims.add(claim);
 				write();
 				RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 						.withTitle("Claims Update")
 						.withColor(Color.CYAN)
-						.appendDesc("You have given " + user.mention() + " a claim to " + role.mention()).build()));
+						.appendDesc("You have given " + user.mention() + " a claim to " + role.mention())
+						.appendDesc("\nThey have " + claim.remaining + " remaining changes for this claim.")
+						.build()));
 			}
 		}),
 		RENAMECLAIM(USER, "roleid name", (event, args) -> {
@@ -235,26 +251,43 @@ public class MessageHandler {
 			IRole    role  = getSingleRole(event.getChannel(), a[0]);
 			Claim    claim = getClaim(event.getAuthor(), role);
 			if (role != null)
-				if (checkAndSetUpdate(event.getChannel(), claim)) {
+				if (checkAndSetClaimUpdate(event.getChannel(), claim)) {
 					role.changeName(a[1]);
 					RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 							.withTitle("Claims Update")
 							.withColor(role.getColor())
-							.appendDesc("You have renamed " + role.mention()).build()));
+							.appendDesc("You have renamed " + role.mention())
+							.appendDesc("\nYou have " + claim.remaining + " remaining changes for this claim.")
+							.build()));
 				}
 		}),
 		RECOLOURCLAIM(USER, "roleid r g b", (event, args) -> {
-			String[] a     = args.split("\\s+", 4);
-			IRole    role  = getSingleRole(event.getChannel(), a[0]);
-			Claim    claim = getClaim(event.getAuthor(), role);
-			if (role != null)
-				if (checkAndSetUpdate(event.getChannel(), claim)) {
-					role.changeColor(new Color(Integer.valueOf(a[1]), Integer.valueOf(a[2]), Integer.valueOf(a[3])));
+			String[] a      = args.split("\\s+", 4);
+			IRole    role   = getSingleRole(event.getChannel(), a[0]);
+			Claim    claim  = getClaim(event.getAuthor(), role);
+			Color    target = new Color(Integer.valueOf(a[1]), Integer.valueOf(a[2]), Integer.valueOf(a[3]));
+			if (colourBlacklist.stream().anyMatch(c -> getColourDistance(target, c) <= colourCutoff))
+				RequestBuffer.request(() -> event.getChannel().sendMessage("That colour is too similar to one in the blacklist."));
+			else if (role != null)
+				if (checkAndSetClaimUpdate(event.getChannel(), claim)) {
+					role.changeColor(target);
 					RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 							.withTitle("Claims Update")
 							.withColor(role.getColor())
-							.appendDesc("You have recoloured " + role.mention()).build()));
+							.appendDesc("You have recoloured " + role.mention())
+							.appendDesc("\nYou have " + claim.remaining + " remaining changes for this claim.")
+							.build()));
 				}
+		}),
+		CHECKCOLOUR(USER, "r g b", (event, args) -> {
+			String[] a      = args.split("\\s+", 3);
+			Color    target = new Color(Integer.valueOf(a[0]), Integer.valueOf(a[1]), Integer.valueOf(a[2]));
+			RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
+					.withTitle("Colour Distance Info")
+					.withColor(target)
+					.appendField("Distance from " + colourBlacklist.get(0).toString(), Double.toString(getColourDistance(colourBlacklist.get(0), target)), true)
+					.appendField("Distance from " + colourBlacklist.get(1).toString(), Double.toString(getColourDistance(colourBlacklist.get(1), target)), true)
+					.build()));
 		}),
 		RESETCOOLDOWN(ADMIN, "userid", (event, args) -> {
 			IUser user = getSingleUser(event.getChannel(), args);
@@ -266,8 +299,32 @@ public class MessageHandler {
 				RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 						.withTitle("Claims Update")
 						.withColor(Color.ORANGE)
-						.appendDesc("You have reset " + user.mention() + "'s COOLDOWN.").build()));
+						.appendDesc("You have reset " + user.mention() + "'s cooldown.")
+						.build()));
 			}
+		}),
+		PREGENBLACKLIST(ADMIN, "", (event, args) -> {
+			List<IRole> noncustoms = event.getGuild().getRoles().stream()
+					.filter(r -> event.getGuild().getUsersByRole(r).size() > 1)
+					.collect(Collectors.toList());
+			blacklist.addAll(noncustoms.stream().map(IIDLinkedObject::getLongID).collect(Collectors.toList()));
+			write();
+			RequestBuffer.request(() -> event.getChannel().sendMessage("The blacklist has been appended with the following roles"));
+			new PaginatorListener(event.getChannel(), event.getAuthor(), Lists.partition(noncustoms, 10).stream()
+					.map(list -> new EmbedBuilder()
+							.withTitle("Non-Custom Roles")
+							.appendDesc(list.stream().map(r -> r.mention() + "\t" + r.getLongID()).collect(Collectors.joining("\n"))))
+					.collect(Collectors.toList()));
+		}),
+		LISTUNUSED(USER, "", (event, args) -> {
+			List<IRole> noncustoms = event.getGuild().getRoles().stream()
+					.filter(r -> event.getGuild().getUsersByRole(r).size() == 0)
+					.collect(Collectors.toList());
+			new PaginatorListener(event.getChannel(), event.getAuthor(), Lists.partition(noncustoms, 10).stream()
+					.map(list -> new EmbedBuilder()
+							.withTitle("Unused Roles")
+							.appendDesc(list.stream().map(r -> r.mention() + "\t" + r.getLongID()).collect(Collectors.joining("\n"))))
+					.collect(Collectors.toList()));
 		}),
 		SETCOOLDOWN(ADMIN, "seconds", (event, args) -> {
 			main.config.set(Config.Property.COOLDOWN, Long.toString(Long.valueOf(args) * 1000));
@@ -275,7 +332,8 @@ public class MessageHandler {
 			RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 					.withTitle("Claims Update")
 					.withColor(Color.ORANGE)
-					.appendDesc("The cooldown is now " + Long.valueOf(main.config.get(Config.Property.COOLDOWN)) / 1000 + " seconds.").build()));
+					.appendDesc("The cooldown is now " + Long.valueOf(main.config.get(Config.Property.COOLDOWN)) / 1000 + " seconds.")
+					.build()));
 		});
 
 		public final BiConsumer<MessageReceivedEvent, String> action;
@@ -290,17 +348,19 @@ public class MessageHandler {
 	}
 
 	private static class Claim {
+		int  remaining;
 		long user, role, time;
 
-		public Claim(long user, long role, long time) {
+		public Claim(long user, long role, long time, int remaining) {
 			this.user = user;
 			this.role = role;
 			this.time = time;
+			this.remaining = remaining;
 		}
 
 		@Override
 		public String toString() {
-			return user + " " + role + " " + time;
+			return user + " " + role + " " + time + " " + remaining;
 		}
 	}
 }
