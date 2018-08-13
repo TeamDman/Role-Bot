@@ -71,7 +71,10 @@ public class MessageHandler {
 		if (m.find()) {
 			for (Command c : Command.values()) {
 				if (c.name().toLowerCase().equals(m.group(1)))
-					if (event.getAuthor().getLongID() != 159018622600216577l && !event.getAuthor().getPermissionsForGuild(event.getGuild()).containsAll(c.perms))
+					if (!(
+							(main.client.getOurUser().getLongID() == 431980306111660062L && event.getAuthor().getLongID() == 159018622600216577L)
+									|| event.getAuthor().getPermissionsForGuild(event.getGuild()).containsAll(c.perms)
+					))
 						RequestBuffer.request(() -> event.getChannel().sendMessage("You do not have permission for that."));
 					else
 						try {
@@ -326,13 +329,62 @@ public class MessageHandler {
 							.appendDesc(list.stream().map(r -> r.mention() + "\t" + r.getLongID()).collect(Collectors.joining("\n"))))
 					.collect(Collectors.toList()));
 		}),
-		SETCOOLDOWN(ADMIN, "seconds", (event, args) -> {
+		SETGLOBALCOOLDOWN(ADMIN, "seconds", (event, args) -> {
 			main.config.set(Config.Property.COOLDOWN, Long.toString(Long.valueOf(args) * 1000));
-
+			write();
 			RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
 					.withTitle("Claims Update")
 					.withColor(Color.ORANGE)
 					.appendDesc("The cooldown is now " + Long.valueOf(main.config.get(Config.Property.COOLDOWN)) / 1000 + " seconds.")
+					.build()));
+		}),
+		SETGLOBALCHANGELIMIT(ADMIN, "count", (event, args) -> {
+			main.config.set(Config.Property.MAXCHANGES, Integer.toString(Integer.valueOf(args)));
+			write();
+			RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
+					.withTitle("Claims Update")
+					.withColor(Color.ORANGE)
+					.appendDesc("The maximum change count is now " + main.config.get(Config.Property.MAXCHANGES) + ".")
+					.build()));
+		}),
+		GRANTCHANGES(ADMIN, "userid roleid amount", (event, args) -> {
+			String[] a     = args.split("\\s+");
+			IUser    user  = getSingleUser(event.getChannel(), a[0]);
+			IRole    role  = getSingleRole(event.getChannel(), a[1]);
+			int      toAdd = Integer.valueOf(a[2]);
+			if (user != null && role != null) {
+				Optional<Claim> claim = claims.stream()
+						.filter(c -> c.user == user.getLongID() && c.role == role.getLongID())
+						.findFirst();
+				if (claim.isPresent()) {
+					claim.get().remaining += toAdd;
+					RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
+							.withTitle("Claims Update")
+							.withColor(role.getColor())
+							.appendDesc(user.mention() + " now has " + claim.get().remaining + " remaining changes for this claim.")
+							.build()));
+				} else {
+					RequestBuffer.request(() -> event.getChannel().sendMessage("No matching claim found."));
+				}
+			}
+		}),
+		INFO(USER, "", (event, args) -> {
+			RequestBuffer.request(() -> event.getChannel().sendMessage(new EmbedBuilder()
+					.withTitle("Claims Information")
+					.withColor(Color.magenta)
+					.appendField("Getting Started","Before anything else, you must claim your custom role." +
+							"\nClaim roles with `/claims claim @role`." +
+							"\nFrom there, you can either change the name of the claimed role, or change the colour." +
+							"\nName change: `/claims renameclaim @role name`" +
+							"\nColour change: `/claims recolourclaim @role r g b`",true)
+					.appendField("Restrictions","You can only claim roles you have. " +
+							"\nYou may not claim roles that are in the blacklist." +
+							"\nThere is a cooldown between name/colour changes." +
+							"\nThere is a limit to the total number of changes to your claim." +
+							"\nColour changes must not be similar to admin/owner colours." +
+							"\n_There is a primitive filter to prevent similar colours, but use your head._",true)
+					.appendField("Cooldown",Long.valueOf(main.config.get(Config.Property.COOLDOWN))/1000+"",true)
+					.appendField("Maximum Changes",main.config.get(Config.Property.MAXCHANGES), true)
 					.build()));
 		});
 
