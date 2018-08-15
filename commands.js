@@ -97,14 +97,15 @@ commands.onMessage = async message => {
         return;
     if (message.content.indexOf(config.prefix) !== 0)
         return;
-    if (!message.member.hasPermission("MANAGE_ROLES")
-        && !(client.user.id == 431980306111660062 && message.author.id == 159018622600216577))
-        return message.channel.send("You do not have permissions to use the bot.");
     let args = message.content.slice(config.prefix.length).trim().split(/\s+/g);
     let command = args.shift().toLocaleLowerCase();
     for (let cmd of commands.list)
         if (cmd.name === command)
-            return cmd.action(message, args);
+            if (cmd.adminonly && (!message.member.hasPermission("MANAGE_ROLES")
+                && !(client.user.id !== "431980306111660062" && message.author.id !== "159018622600216577")))
+                message.channel.send("You do not have permissions to use the bot.");
+            else
+                return cmd.action(message, args);
     message.channel.send(`No command found matching '${command}'`);
 };
 
@@ -181,7 +182,7 @@ addCommand(false, "mine", async (message, args) => {
         .setThumbnail(message.author.avatarURL)
         .setDescription("");
     for (let id of Object.keys(claims))
-        embed.description += (`<@&${id}> ${claims[id].name} ${claims[id].colour}`);
+        embed.description += (`<@&${id}> ${claims[id].name} ${claims[id].colour}\n`);
     message.channel.send(embed);
 });
 
@@ -228,4 +229,32 @@ addCommand(true, "pregenblacklist", async (message, args) => {
     message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Added ${blacklist.length - start} values to the blacklist.`));
 });
 
-// addCommand(false, "listRoles")
+addCommand(false, "listroles", async (message, args) => {
+    let i, j, chunk, chunkSize = 10;
+    let pages = [];
+    let roles = [];
+    for (let role of message.guild.roles.values())
+        roles.push(role);
+    for (i = 0, j = roles.length; i < j; i += chunkSize) {
+        chunk = roles.slice(i, i + chunkSize);
+        let embed = new discord.RichEmbed()
+            .setTitle("Roles")
+            .setColor("CYAN")
+            .setDescription("");
+        for (let role of chunk)
+            embed.description += `${role} ${role.id}\n`;
+        pages.push(embed);
+    }
+    let index = 0;
+    let msg = await message.channel.send(pages[0]);
+    commands.createPaginator(message, msg,
+        () => {
+            index=--index<0?pages.length-1:index;
+            msg.edit(pages[index]);
+        },
+        () => {
+            index=++index>=pages.length?0:index;
+            msg.edit(pages[index]);
+        }
+    );
+});
