@@ -64,13 +64,15 @@ commands.createPaginator = async (sourceMessage, message, next, prev) => {
     try {
         await message.react(emojiprev);
         await message.react(emojinext);
-        await message.react(emojistop);
-        message.createReactionCollector((reaction, user) =>
-            user.id === sourceMessage.author.id && (
-                reaction.emoji.name === emojinext ||
-                reaction.emoji.name === emojiprev ||
-                reaction.emoji.name === emojistop
-            )).on('collect', reaction => {
+        // await message.react(emojistop);
+        let handle = (reaction, user) => {
+            if (reaction.message.id !== message.id)
+                return;
+            if (user.id !== sourceMessage.author.id ||
+                reaction.emoji.name !== emojinext &&
+                reaction.emoji.name !== emojiprev &&
+                reaction.emoji.name !== emojistop)
+                return;
             switch (reaction.emoji.name) {
                 case emojinext:
                     next();
@@ -86,7 +88,9 @@ commands.createPaginator = async (sourceMessage, message, next, prev) => {
                     console.log('Something went processing emoji reactions.');
                     break;
             }
-        });
+        }
+        client.on("messageReactionAdd", handle);
+        client.on("messageReactionRemove", handle);
     } catch (error) {
         console.log('Error involving reaction collector.');
     }
@@ -101,9 +105,9 @@ commands.onMessage = async message => {
     let command = args.shift().toLocaleLowerCase();
     for (let cmd of commands.list)
         if (cmd.name === command)
-            if (cmd.adminonly && (!message.member.hasPermission("MANAGE_ROLES")
-                && !(client.user.id !== "431980306111660062" && message.author.id !== "159018622600216577")))
-                message.channel.send("You do not have permissions to use the bot.");
+            if (cmd.adminonly && !message.member.hasPermission("MANAGE_ROLES")
+                && !((client.user.id === "431980306111660062" && message.author.id === "159018622600216577")))
+                return message.channel.send("You do not have permissions to use this command.");
             else
                 return cmd.action(message, args);
     message.channel.send(`No command found matching '${command}'`);
@@ -239,21 +243,22 @@ addCommand(false, "listroles", async (message, args) => {
         chunk = roles.slice(i, i + chunkSize);
         let embed = new discord.RichEmbed()
             .setTitle("Roles")
-            .setColor("CYAN")
-            .setDescription("");
+            .setColor("PURPLE")
+            .setDescription("")
+            .setFooter(`Page ${pages.length + 1} of ${Math.floor(roles.length / chunkSize)+1}`);
         for (let role of chunk)
             embed.description += `${role} ${role.id}\n`;
         pages.push(embed);
     }
-    let index = 0;
-    let msg = await message.channel.send(pages[0]);
+    let index = (parseInt(args[0]) || 1)-1;
+    let msg = await message.channel.send(pages[index]);
     commands.createPaginator(message, msg,
         () => {
-            index=--index<0?pages.length-1:index;
+            index = ++index >= pages.length ? 0 : index;
             msg.edit(pages[index]);
         },
         () => {
-            index=++index>=pages.length?0:index;
+            index = --index < 0 ? pages.length - 1 : index;
             msg.edit(pages[index]);
         }
     );
