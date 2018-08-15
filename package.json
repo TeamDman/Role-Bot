@@ -1,0 +1,24 @@
+{
+  "name": "warden-bot",
+  "version": "2.0.0",
+  "description": "A node.js discord bot for managing new users",
+  "main": "app.js",
+  "dependencies": {
+    "discord.js": "^11.4.2",
+    "jsonfile": "^4.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TeamDman/Warden-Bot.git"
+  },
+  "author": "TeamDman",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TeamDman/Warden-Bot/issues"
+  },
+  "homepage": "https://github.com/TeamDman/Warden-Bot#readme"
+}
