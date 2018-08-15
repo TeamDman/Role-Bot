@@ -57,6 +57,41 @@ commands.getClaims = user => {
         return claims[user.id];
 }
 
+commands.createPaginator = async (sourceMessage, message, next, prev) => {
+    const emojinext = "▶";
+    const emojiprev = "◀";
+    const emojistop = "❌";
+    try {
+        await message.react(emojiprev);
+        await message.react(emojinext);
+        await message.react(emojistop);
+        message.createReactionCollector((reaction, user) =>
+            user.id === sourceMessage.author.id && (
+                reaction.emoji.name === emojinext ||
+                reaction.emoji.name === emojiprev ||
+                reaction.emoji.name === emojistop
+            )).on('collect', reaction => {
+            switch (reaction.emoji.name) {
+                case emojinext:
+                    next();
+                    break;
+                case emojiprev:
+                    prev();
+                    break;
+                case emojistop:
+                    message.delete().catch(e => console.log(e));
+                    sourceMessage.delete().catch(e => console.log(e));
+                    break;
+                default:
+                    console.log('Something went processing emoji reactions.');
+                    break;
+            }
+        });
+    } catch (error) {
+        console.log('Error involving reaction collector.');
+    }
+};
+
 commands.onMessage = async message => {
     if (message.author.bot)
         return;
@@ -121,12 +156,18 @@ addCommand(true, "setraw", async (message, args) => {
 addCommand(false, "claim", async (message, args) => {
     let role = commands.getRole(args.join(" "));
     if (role !== null) {
-        commands.getClaims(message.author)[role.id] = {
-            name: config.max_changes_name,
-            colour: config.max_changes_colour
-        };
-        commands.writeClaims();
-        message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`You have claimed <@&${role.id}>`));
+        if (blacklist.includes(role.id)) {
+            message.channel.send(new discord.RichEmbed().setColor("ORANGE").setDescription(`You are not allowed to claim ${role}.`));
+        } else if (!message.member.roles.has(role.id)) {
+            message.channel.send(new discord.RichEmbed().setColor("ORANGE").setDescription(`You do not have the ${role} role.`));
+        } else {
+            commands.getClaims(message.author)[role.id] = {
+                name: config.max_changes_name,
+                colour: config.max_changes_colour
+            };
+            commands.writeClaims();
+            message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`You have claimed ${role}.`));
+        }
     } else {
         message.channel.send("No role found with that id.");
     }
@@ -176,3 +217,15 @@ addCommand(true, "unblacklist", async (message, args) => {
         message.channel.send("No role found with that id.");
     }
 });
+
+addCommand(true, "pregenblacklist", async (message, args) => {
+    let start = blacklist.length;
+    for (let role of message.guild.roles.values())
+        if (!blacklist.includes(role.id))
+            if (role.members.size > 1)
+                blacklist.push(role.id);
+    commands.writeBlacklist();
+    message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Added ${blacklist.length - start} values to the blacklist.`));
+});
+
+// addCommand(false, "listRoles")
