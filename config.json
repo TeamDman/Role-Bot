@@ -1,5 +1,5 @@
 {
-    "prefix": "/claimz",
+    "prefix": "/claims",
     "max_changes_name": 3,
     "max_changes_colour": 3,
     "presence": "pretty colours",

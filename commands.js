@@ -138,7 +138,8 @@ addCommand(false, {name: "help"}, async (message, args) => {
             `Before anything else, you must claim your custom role.` +
             `\nClaim role: \`${config.prefix} claim @role\`` +
             `\nRename role: \`${config.prefix} rename @role name\`` +
-            `\nRecolour role: \`${config.prefix} recolour r g b\``, true)
+            `\nRecolour role: \`${config.prefix} recolour r g b\`` +
+            `\nView your claims: \`${config.prefix} info\``, true)
         .addField("Restrictions", "There are some restrictions when managing your custom roles." +
             `\nUse the \`${config.prefix} restrictions\` command to view them.`, true)
     );
