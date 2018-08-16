@@ -312,7 +312,7 @@ addCommand(false, {name: "listroles"}, async (message, args) => {
     );
 });
 
-addCommand(true, {name: "addchanges", pattern: /(?:give|add)changes/}, async (message, args) => {
+addCommand(true, {name: "addchanges", pattern: /(?:give|add|grant)changes/}, async (message, args) => {
     let user = commands.getUser(message.guild, args[0]);
     if (user === null)
         return message.channel.send("Could not find the user specified.");
@@ -377,6 +377,7 @@ addCommand(false, {name: "setcolour", pattern: /(?:set|re)colou?r/}, async (mess
 
 addCommand(false, {name: "checkcolour", pattern: /checkcolou?r/}, async (message, args) => {
     let colour = [parseInt(args.shift()), parseInt(args.shift()), parseInt(args.shift())];
+    let dist = 300;
     for (let c of config.colour_blacklist)
         if ((dist = Math.floor(commands.getColourDistance(c, colour))) < config.colour_distance_threshold)
             return message.channel.send(`The chosen colour is too close to ${util.inspect(c)} (distance ${dist}, minimum ${config.colour_distance_threshold}).`);
