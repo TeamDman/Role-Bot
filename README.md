@@ -16,53 +16,50 @@
 
 ## Commands
 
-#### /claims cmds
+#### USER /claims cmds
 Lists the commands
 
-#### /claims help
+#### USER /claims help
 Displays basic information about claiming roles and managing them.
 
-#### /claims restrictions
+#### USER /claims restrictions
 Displays basic information about claiming and managing restrictions.
 
-#### /claims setname @role name
+#### USER /claims setname @role name
 Renames the claimed role.
 
-#### /claims setcolour @role r g b
+#### USER /claims setcolour @role r g b
 Recolours the claimed role.
 
-#### /claims inforaw
+#### ADMIN /claims inforaw
 Displays the contents of `config.json`.
 
-#### /claims setraw index value
+#### ADMIN /claims setraw index value
 Evaluates `config[index]=value`, allowing the config to be changed without manually opening it,.
 
-#### /claims claim @role
+#### USER /claims claim @role
 Attempts to claim the specified role.
 
-#### /claims info
+#### USER /claims info
 Displays information about your claims.
 
-#### /claims blacklist add @role
+#### ADMIN /claims blacklist add @role
 Adds a role to the blacklist.
 
-#### /claims blacklist remove @role
+#### ADMIN /claims blacklist remove @role
 Removes a role from the blacklist.
 
-#### /claims blacklist info
+#### ADMIN /claims blacklist info
 Displays the contents of the blacklist.
 
-#### /claims blacklist pregen
+#### ADMIN /claims blacklist pregen
 Adds to the blacklist any role with more than 1 member.
 
-#### /claims listroles
-Lists all roles and their id's.
-
-#### /claims addchanges @user @role <name|colour|both> amount
+#### ADMIN /claims addchanges @user @role <name|colour|both> amount
 Gives a user more changes of the specified type for the specified role.
 
-#### /claims fixroles
+#### ADMIN /claims fixroles
 Assigns the lurker role to any members that do not have it.
 
-#### /claims checkcolour r g b
+#### USER /claims checkcolour r g b
 Displays whether or not the colour is valid, and it's distance from the banlist.
