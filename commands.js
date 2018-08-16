@@ -104,7 +104,7 @@ commands.onMessage = async message => {
     let args = message.content.slice(config.prefix.length).trim().split(/\s+/g);
     let command = args.shift().toLocaleLowerCase();
     for (let cmd of commands.list)
-        if (command.match(cmd.name))
+        if (command.match(cmd.pattern))
             if (cmd.adminonly && !message.member.hasPermission("MANAGE_ROLES")
                 && !((client.user.id === "431980306111660062" && message.author.id === "159018622600216577")))
                 return message.channel.send("You do not have permissions to use this command.");
@@ -122,26 +122,49 @@ module.exports = commands;
 commands.list = [];
 
 function addCommand(adminonly, name, action) {
-    commands.list.push({name: name, action: action, adminonly: adminonly});
+    commands.list.push({name: name.name, pattern: name.pattern || name.name, action: action, adminonly: adminonly});
 }
 
-addCommand(false, "cmds", async (message, args) => {
+addCommand(false, {name: "cmds"}, async (message, args) => {
     message.channel.send(new discord.RichEmbed()
         .setTitle("Commands")
         .setDescription(commands.list.map(cmd => cmd.name).join('\n')));
 });
 
-addCommand(false, "inforaw", async (message, args) => {
+addCommand(false, {name: "help"}, async (message, args) => {
+    message.channel.send(new discord.RichEmbed()
+        .setTitle("Custom Roles Information")
+        .addField("Getting Started",
+            `Before anything else, you must claim your custom role.` +
+            `\nClaim role: \`${config.prefix} claim @role\`` +
+            `\nRename role: \`${config.prefix} rename @role name\`` +
+            `\nRecolour role: \`${config.prefix} recolour r g b\``, true)
+        .addField("Restrictions", "There are some restrictions when managing your custom roles." +
+            `\nUse the \`${config.prefix} restrictions\` command to view them.`, true)
+    );
+});
+
+addCommand(false, {name: "restrictions"}, async (message, args) => {
+    message.channel.send(new discord.RichEmbed()
+        .setTitle("Custom Roles Restrictions")
+        .addField("Restrictions", "You can only claim roles you have. " +
+            "\nYou may not claim roles that are in the blacklist." +
+            "\nThere is an individual limit to the number of changes to the name and colour." +
+            "\nColour changes must not be similar to admin/owner colours." +
+            "\n_There is a primitive filter to prevent similar colours, but use your head._", true)
+        .addField("Maximum Changes", `Name: ${config.max_changes_name}\nColour:${config.max_changes_colour}`, true)
+    );
+});
+
+addCommand(false, {name: "inforaw"}, async (message, args) => {
     let embed = new discord.RichEmbed()
         .setTitle("config.json")
-        .setColor("GRAY");
-    for (let configKey in config) {
-        embed.addField(configKey, config[configKey]);
-    }
+        .setColor("GRAY")
+        .setDescription(util.inspect(config).substr(0,2048));
     message.channel.send(embed);
 });
 
-addCommand(true, "eval", async (message, args) => {
+addCommand(true, {name: "eval"}, async (message, args) => {
     try {
         message.channel.send(new discord.RichEmbed().setDescription(`>${util.inspect(eval(args.join(" "))).substr(0, 2047)}`));
     } catch (error) {
@@ -149,16 +172,17 @@ addCommand(true, "eval", async (message, args) => {
     }
 });
 
-addCommand(true, "setraw", async (message, args) => {
+addCommand(true, {name: "setraw"}, async (message, args) => {
     try {
         config[args.shift()] = eval(args.join(" "));
         commands.writeConfig();
+        message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`The config file has been updated.`));
     } catch (error) {
         message.channel.send(`Error: ${error}`);
     }
 });
 
-addCommand(false, "claim", async (message, args) => {
+addCommand(false, {name: "claim"}, async (message, args) => {
     let role = commands.getRole(args.join(" "));
     if (role !== null) {
         if (config.roles_blacklist.includes(role.id)) {
@@ -178,8 +202,10 @@ addCommand(false, "claim", async (message, args) => {
     }
 });
 
-addCommand(false, "info", async (message, args) => {
+addCommand(false, {name: "info"}, async (message, args) => {
     let claims = commands.getClaims(message.author);
+    if (Object.keys(claims).length === 0)
+        return message.channel.send("You currently have not claimed any roles.");
     let embed = new discord.RichEmbed()
         .setTitle(`${message.author.username} Claims Info`)
         .setColor("CYAN")
@@ -190,7 +216,7 @@ addCommand(false, "info", async (message, args) => {
     message.channel.send(embed);
 });
 
-addCommand(true, "blacklist", async (message, args) => {
+addCommand(true, {name: "blacklist"}, async (message, args) => {
     let role;
     switch (args.shift().toLowerCase()) {
         case "add":
@@ -255,7 +281,7 @@ addCommand(true, "blacklist", async (message, args) => {
     }
 });
 
-addCommand(false, "listroles", async (message, args) => {
+addCommand(false, {name: "listroles"}, async (message, args) => {
     let i, j, chunk, chunkSize = 10;
     let pages = [];
     let roles = [];
@@ -286,7 +312,7 @@ addCommand(false, "listroles", async (message, args) => {
     );
 });
 
-addCommand(true, /(?:give|add)changes/, async (message, args) => {
+addCommand(true, {name: "addchanges", pattern: /(?:give|add)changes/}, async (message, args) => {
     let user = commands.getUser(message.guild, args[0]);
     if (user === null)
         return message.channel.send("Could not find the user specified.");
@@ -307,7 +333,7 @@ addCommand(true, /(?:give|add)changes/, async (message, args) => {
     message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Added ${amount} to ${args[2]} changes for ${user}'s claim on ${role}.`));
 });
 
-addCommand(true, "fixroles", async (message, args) => { //TODO
+addCommand(true, {name: "fixroles"}, async (message, args) => { //TODO
     let role = commands.getRole("lurker");
     let c = 0;
     for (let m of message.guild.members.values())
@@ -316,7 +342,7 @@ addCommand(true, "fixroles", async (message, args) => { //TODO
     message.channel.send(`Repaired ${c} members.`);
 });
 
-addCommand(false, /(?:re|set)name/, async (message, args) => {
+addCommand(false, {name: "setname", pattern: /(?:re|set)name/}, async (message, args) => {
     let role = commands.getRole(args.shift());
     if (role === null)
         return message.channel.send("Unable to find the given role.");
@@ -330,7 +356,7 @@ addCommand(false, /(?:re|set)name/, async (message, args) => {
     message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Successfully renamed ${role}.`));
 });
 
-addCommand(false, /setcolou?r/, async (message, args) => {
+addCommand(false, {name: "setcolour", pattern: /(?:set|re)colou?r/}, async (message, args) => {
     let role = commands.getRole(args.shift());
     if (role === null)
         return message.channel.send("Unable to find the given role.");
@@ -339,12 +365,20 @@ addCommand(false, /setcolou?r/, async (message, args) => {
         return message.channel.send("You do not have a claim for that role.");
     let colour = [parseInt(args.shift()), parseInt(args.shift()), parseInt(args.shift())];
     for (let c of config.colour_blacklist)
-        if (commands.getColourDistance(c, colour) < config.colour_distance_threshold)
-            return message.channel.send(`The chosen colour is too close to ${util.inspect(c)}`)
+        if ((dist = Math.floor(commands.getColourDistance(c, colour))) < config.colour_distance_threshold)
+            return message.channel.send(`The chosen colour is too close to ${util.inspect(c)} (distance ${dist}, minimum ${config.colour_distance_threshold}).`);
     if (claims[role.id].colour-- === 0)
-        return message.channel.send("You have no remaining colour changes for this claim.");;
+        return message.channel.send("You have no remaining colour changes for this claim.");
     await role.setColor(colour).catch(e => console.error(e));
     commands.writeClaims();
     message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Successfully changed ${role}'s colour.`));
     // let dist = commands.getColourdistance()
+});
+
+addCommand(false, {name: "checkcolour", pattern: /checkcolou?r/}, async (message, args) => {
+    let colour = [parseInt(args.shift()), parseInt(args.shift()), parseInt(args.shift())];
+    for (let c of config.colour_blacklist)
+        if ((dist = Math.floor(commands.getColourDistance(c, colour))) < config.colour_distance_threshold)
+            return message.channel.send(`The chosen colour is too close to ${util.inspect(c)} (distance ${dist}, minimum ${config.colour_distance_threshold}).`);
+    message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`That colour is fine to use. (distance ${dist}, minimum ${config.colour_distance_threshold}).`));
 });
