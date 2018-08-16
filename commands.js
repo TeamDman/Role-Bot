@@ -157,7 +157,7 @@ addCommand(false, {name: "restrictions"}, async (message, args) => {
     );
 });
 
-addCommand(false, {name: "inforaw"}, async (message, args) => {
+addCommand(true, {name: "inforaw"}, async (message, args) => {
     let embed = new discord.RichEmbed()
         .setTitle("config.json")
         .setColor("GRAY")
@@ -280,37 +280,6 @@ addCommand(true, {name: "blacklist"}, async (message, args) => {
             commands.writeConfig();
             message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Added ${config.roles_blacklist.length - start} values to the blacklist.`));
     }
-});
-
-addCommand(false, {name: "listroles"}, async (message, args) => {
-    let i, j, chunk, chunkSize = 10;
-    let pages = [];
-    let roles = [];
-    for (let role of message.guild.roles.values())
-        roles.push(role);
-    for (i = 0, j = roles.length; i < j; i += chunkSize) {
-        chunk = roles.slice(i, i + chunkSize);
-        let embed = new discord.RichEmbed()
-            .setTitle("Roles")
-            .setColor("PURPLE")
-            .setDescription("")
-            .setFooter(`Page ${pages.length + 1} of ${Math.floor(roles.length / chunkSize) + 1}`);
-        for (let role of chunk)
-            embed.description += `${role} ${role.id}\n`;
-        pages.push(embed);
-    }
-    let index = (parseInt(args[0]) || 1) - 1;
-    let msg = await message.channel.send(pages[index]);
-    commands.createPaginator(message, msg,
-        () => {
-            index = ++index >= pages.length ? 0 : index;
-            msg.edit(pages[index]);
-        },
-        () => {
-            index = --index < 0 ? pages.length - 1 : index;
-            msg.edit(pages[index]);
-        }
-    );
 });
 
 addCommand(true, {name: "addchanges", pattern: /(?:give|add|grant)changes/}, async (message, args) => {
