@@ -1,6 +1,20 @@
 {
-    "prefix": "/claimz",
-    "max_changes_name": 7,
-    "max_changes_colour": 3,
-    "presence": "pretty colours"
+  "prefix": "/claimz",
+  "max_changes_name": 7,
+  "max_changes_colour": 3,
+  "presence": "pretty colours",
+  "colour_distance_threshold": 200,
+  "colour_blacklist": [
+    [
+      51,
+      152,
+      219
+    ],
+    [
+      255,
+      0,
+      0
+    ]
+  ],
+  "roles_blacklist": []
 }
