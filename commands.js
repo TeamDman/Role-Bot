@@ -353,7 +353,7 @@ addCommand(false, {name: "setname", pattern: /(?:re|set)name/}, async (message, 
         return message.channel.send("You have no remaining name changes for this claim.");
     await role.setName(args.join(" ")).catch(e => console.error(e));
     commands.writeClaims();
-    message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Successfully renamed ${role}.`));
+    message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Successfully renamed ${role}. This role has ${claims[role.id].name} remaining name changes.`));
 });
 
 addCommand(false, {name: "setcolour", pattern: /(?:set|re)colou?r/}, async (message, args) => {
@@ -371,7 +371,7 @@ addCommand(false, {name: "setcolour", pattern: /(?:set|re)colou?r/}, async (mess
         return message.channel.send("You have no remaining colour changes for this claim.");
     await role.setColor(colour).catch(e => console.error(e));
     commands.writeClaims();
-    message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Successfully changed ${role}'s colour.`));
+    message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Successfully changed ${role}'s colour. This role has ${claims[role.id].colour} remaining colour changes.`));
     // let dist = commands.getColourdistance()
 });
 
