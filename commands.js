@@ -53,8 +53,32 @@ commands.getClaims = user => {
         return claims[user.id];
 };
 
-commands.getColourDistance = (first, second) => {
-    return Math.abs(Math.sqrt(Math.pow(second[0] - first[0], 2) + Math.pow(second[1] - first[1], 2) + Math.pow(second[2] - first[2], 2)));
+commands.isColourInvalid = (first, second) => { // todo: hue wraparound
+    if (config.colour_distance_usehsv) {
+        first = commands.rbgToHsv(first[0], first[1], first[2]);
+        second = commands.rbgToHsv(second[0], second[1], second[2]);
+        let delta = {threshold: config.colour_distance_hsv};
+        return [
+            (delta.r = Math.abs(first[0] - second[0])) <= config.colour_distance_hsv[0] |
+            (delta.g = Math.abs(first[1] - second[1])) <= config.colour_distance_hsv[1] |
+            (delta.b = Math.abs(first[2] - second[2])) <= config.colour_distance_hsv[2],
+            delta
+        ];
+    } else {
+        let delta = {threshold:config.colour_distance_threshold};
+        return [
+            (delta.delta = Math.floor(
+                Math.abs(
+                    Math.sqrt(
+                        Math.pow((second[0] - first[0]), 2) +
+                        Math.pow((second[1] - first[1]), 2) +
+                        Math.pow((second[2] - first[2]), 2)
+                    )
+                )
+            )) < config.colour_distance_threshold
+            , delta
+        ];
+    }
 };
 
 commands.createPaginator = async (sourceMessage, message, next, prev) => {
@@ -94,6 +118,47 @@ commands.createPaginator = async (sourceMessage, message, next, prev) => {
     } catch (error) {
         console.log('Error involving reaction collector.');
     }
+};
+
+/**
+ * Converts an RGB color value to HSV. Conversion formula
+ * adapted from http://en.wikipedia.org/wiki/HSV_color_space.
+ * Assumes r, g, and b are contained in the set [0, 255] and
+ * returns h, s, and v in the set [0, 1].
+ *
+ * @param   Number  r       The red color value
+ * @param   Number  g       The green color value
+ * @param   Number  b       The blue color value
+ * @return  Array           The HSV representation
+ */
+commands.rbgToHsv = (r, g, b) => {
+    r /= 255, g /= 255, b /= 255;
+
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    var h, s, v = max;
+
+    var d = max - min;
+    s = max == 0 ? 0 : d / max;
+
+    if (max == min) {
+        h = 0; // achromatic
+    } else {
+        switch (max) {
+            case r:
+                h = (g - b) / d + (g < b ? 6 : 0);
+                break;
+            case g:
+                h = (b - r) / d + 2;
+                break;
+            case b:
+                h = (r - g) / d + 4;
+                break;
+        }
+
+        h /= 6;
+    }
+
+    return [h, s, v];
 };
 
 commands.onMessage = async message => {
@@ -161,7 +226,7 @@ addCommand(true, {name: "inforaw"}, async (message, args) => {
     let embed = new discord.RichEmbed()
         .setTitle("config.json")
         .setColor("GRAY")
-        .setDescription(util.inspect(config).substr(0,2048));
+        .setDescription(util.inspect(config).substr(0, 2048));
     message.channel.send(embed);
 });
 
@@ -314,6 +379,7 @@ addCommand(true, {name: "fixroles"}, async (message, args) => { //TODO
 
 addCommand(false, {name: "setname", pattern: /(?:re|set)name/}, async (message, args) => {
     let role = commands.getRole(args.shift());
+    let name = args.join(" ");
     if (role === null)
         return message.channel.send("Unable to find the given role.");
     let claims = commands.getClaims(message.author);
@@ -321,6 +387,8 @@ addCommand(false, {name: "setname", pattern: /(?:re|set)name/}, async (message, 
         return message.channel.send("You do not have a claim for that role.");
     if (claims[role.id].name-- === 0)
         return message.channel.send("You have no remaining name changes for this claim.");
+    if (name.length == 0)
+        return message.channel.send("New name must not be empty");
     await role.setName(args.join(" ")).catch(e => console.error(e));
     commands.writeClaims();
     message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`Successfully renamed ${role}. This role has ${claims[role.id].name} remaining name changes.`));
@@ -333,9 +401,14 @@ addCommand(false, {name: "setcolour", pattern: /(?:set|re)colou?r/}, async (mess
     let claims = commands.getClaims(message.author);
     if (!claims[role.id])
         return message.channel.send("You do not have a claim for that role.");
-    let colour = [parseInt(args.shift()), parseInt(args.shift()), parseInt(args.shift())];
+    let r = args.shift();
+    let g = args.shift();
+    let b = args.shift();
+    let colour = [parseInt(r),parseInt(g),parseInt(b)];
+    if (r===undefined || g === undefined || b === undefined)
+        return message.channel.send("Colour can't be undefined");
     for (let c of config.colour_blacklist)
-        if ((dist = Math.floor(commands.getColourDistance(c, colour))) < config.colour_distance_threshold)
+        if (commands.isColourInvalid(c, colour))
             return message.channel.send(`The chosen colour is too close to ${util.inspect(c)} (distance ${dist}, minimum ${config.colour_distance_threshold}).`);
     if (claims[role.id].colour-- === 0)
         return message.channel.send("You have no remaining colour changes for this claim.");
@@ -347,9 +420,9 @@ addCommand(false, {name: "setcolour", pattern: /(?:set|re)colou?r/}, async (mess
 
 addCommand(false, {name: "checkcolour", pattern: /checkcolou?r/}, async (message, args) => {
     let colour = [parseInt(args.shift()), parseInt(args.shift()), parseInt(args.shift())];
-    let dist = 300;
+    let delta;
     for (let c of config.colour_blacklist)
-        if ((dist = Math.floor(commands.getColourDistance(c, colour))) < config.colour_distance_threshold)
-            return message.channel.send(`The chosen colour is too close to ${util.inspect(c)} (distance ${dist}, minimum ${config.colour_distance_threshold}).`);
+        if ((delta = commands.isColourInvalid(c, colour))[0])
+            return message.channel.send(`The chosen colour is too close to ${util.inspect(c)}. (delta ${util.inspect(delta[1])})`);
     message.channel.send(new discord.RichEmbed().setColor("GREEN").setDescription(`That colour is fine to use. (distance ${dist}, minimum ${config.colour_distance_threshold}).`));
 });
